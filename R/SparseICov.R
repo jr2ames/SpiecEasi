@@ -93,23 +93,52 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
   
   args <- list(...)
   
-  method <- switch(method, glasso = "glasso", mb = "mb",
-                   stop("Method not supported"))
+#  method <- switch(method, glasso = "glasso", mb = "mb",
+#                   stop("Method not supported"))
   
-  if (is.null(args$lambda.min.ratio)) args$lambda.min.ratio <- 1e-3
+
   
   if (method %in% c("glasso")) {
+    if (is.null(args$lambda.min.ratio)) args$lambda.min.ratio <- 1e-3
     do.call(huge::huge, c(args, list(x=data, method=method, verbose=verbose, 
                                      cov.output = cov.output)))
     
   } else if (method %in% c('mb')) {
+    if (is.null(args$lambda.min.ratio)) args$lambda.min.ratio <- 1e-3
     est <- do.call(huge::huge.mb, c(args, list(x=data, verbose=verbose)))
     est$method <- 'mb'
     est$data <- data
     est$sym  <- ifelse(!is.null(args$sym), args$sym, 'or')
-    return(est)
+    
+  } else if (method %in% c('GGM')) {
+    link <- 'gaussian'
+    if (is.null(args$lambda.path)) {
+            lmax = XMRF:::myglmnet.max(t(X), link = link)
+            if (is.null(args$lambda.min.ratio)) args$lambda.min.ratio <- .01
+            if (is.null(args$nlams)) args$nlams <- 20
+                args$lambda = exp(seq(log(lmax), log(args$lambda.min.ratio), l = args$nlams))
+        }
+        args$lambda.min.ratio <- NULL
+        args$nlams <- NULL
+    est <- do.call(XMRF:::glm.network, c(args, list(t(data), method, Y = NULL, link=link)))
+    est <- lapply(1:dim(est)[3], function(i) est[,,i])
+    
+  } else if (method %in% c('ISM')) {
+    link <- 'binomial'
+    est <- do.call(XMRF:::glm.network, c(args, list(t(data), method, Y = NULL))) 
+    
+  } else if (method %in% c('LPGM')) {
+        if (is.null(args$lambda.path)) {
+            lmax = lambdaMax(t(X))
+            if (is.null(args$lambda.min.ratio)) args$lambda.min.ratio <- .01
+            if (is.null(args$nlams)) args$nlams <- 20
+                args$lambda = exp(seq(log(lmax), log(args$lambda.min.ratio), l = args$nlams))
+        }
+        args$lambda.min.ratio <- NULL
+        args$nlams <- NULL
+    est <- do.call(XMRF:::LPGM.network, c(args, list(t(data))))
   }
-  
+    return(est)
 }
 
 
