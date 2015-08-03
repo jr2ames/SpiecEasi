@@ -115,9 +115,12 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
         }
         args$lambda.min.ratio <- NULL
         args$nlams <- NULL
-        est <- do.call(XMRF:::glm.network, c(args, list(t(data), method, Y = NULL, link=link)))
-        est <- lapply(1:dim(est)[3], function(i) est[,,i])
-
+        path <- do.call(XMRF:::glm.network, c(args, list(t(data), method, Y = NULL, link=link)))
+        est <- list()
+        est$data <- data
+        est$path <- lapply(1:length(args$lambda), function(i) path[,,i])
+        est$lambda.path <- args$lambda
+        
   } else if (method %in% c('LPGM')) {
         if (is.null(args$lambda.path)) {
             lmax = lambdaMax(t(X))
@@ -127,7 +130,11 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
         }
         args$lambda.min.ratio <- NULL
         args$nlams <- NULL
-    est <- do.call(XMRF:::LPGM.network, c(args, list(t(data))))
+        path <- do.call(XMRF:::LPGM.network, c(args, list(t(data))))
+        est <- list()
+        est$data <- data
+        est$path <- path
+        est$lambda.path <- args$lambda
   }
     return(est)
 }
@@ -259,16 +266,16 @@ icov.select <- function(est, criterion = 'stars', stars.thresh = 0.05, ebic.gamm
         #                merge <- replicate(nlambda, Matrix(0, d,d))
         ind.sample = sample(c(1:n), floor(n * stars.subsample.ratio), 
                             replace = FALSE)
-        if (est$method == "mb") 
-          tmp = huge.mb(normfun(est$data[ind.sample, ]), lambda = est$lambda, 
-                        scr = est$scr, idx.mat = est$idx.mat, sym = est$sym, 
-                        verbose = FALSE)$path
-        if (est$method == "ct") 
-          tmp = huge.ct(normfun(est$data[ind.sample, ]), lambda = est$lambda, 
-                        verbose = FALSE)$path
-        if (est$method == "glasso") 
-          tmp = huge.glasso(normfun(est$data[ind.sample, ]), lambda = est$lambda, 
-                            scr = est$scr, verbose = FALSE)$path
+#        if (est$method == "mb") 
+#          tmp = huge.mb(normfun(est$data[ind.sample, ]), lambda = est$lambda, 
+#                        scr = est$scr, idx.mat = est$idx.mat, sym = est$sym, 
+#                        verbose = FALSE)$path
+#        if (est$method == "ct") 
+#          tmp = huge.ct(normfun(est$data[ind.sample, ]), lambda = est$lambda, 
+#                        verbose = FALSE)$path
+#        if (est$method == "glasso") 
+#          tmp = huge.glasso(normfun(est$data[ind.sample, ]), lambda = est$lambda, 
+#                            scr = est$scr, verbose = FALSE)$path
         #                for (j in 1:nlambda) merge[[j]] <- merge[[j]] + tmp[[j]]
         
         rm(ind.sample)
