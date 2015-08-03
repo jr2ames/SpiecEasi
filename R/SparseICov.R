@@ -16,7 +16,6 @@ spiec.easi.phyloseq <- function(obj, ...) {
   spiec.easi.default(OTU, ...)
 }
 
-
 #' Spiec-Easi pipeline
 #' @param data non-normalized count OTU/data table with samples on rows and features/OTUs in columns
 #' @param method estimation method to use as a character string. Currently either 'glasso' or 'mb' (meinshausen-buhlmann)
@@ -41,8 +40,6 @@ spiec.easi.default <- function(data, method='glasso', sel.criterion='stars', ver
   }
   return(est)
 }
-
-
 
 #' Sparse/penalized estimators of covariance matrices
 #'
@@ -95,12 +92,10 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
   
 #  method <- switch(method, glasso = "glasso", mb = "mb",
 #                   stop("Method not supported"))
-  
-
-  
+    
   if (method %in% c("glasso")) {
     if (is.null(args$lambda.min.ratio)) args$lambda.min.ratio <- 1e-3
-    do.call(huge::huge, c(args, list(x=data, method=method, verbose=verbose, 
+    est <- do.call(huge::huge, c(args, list(x=data, method=method, verbose=verbose, 
                                      cov.output = cov.output)))
     
   } else if (method %in% c('mb')) {
@@ -140,7 +135,6 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
   }
     return(est)
 }
-
 
 #' Model selection for picking the right \code{lambda} penalty.
 #' This is identical to huge::huge.stars except that the subsampling loop is replaced with an mclapply function to add parallelization capabilities.
@@ -319,10 +313,7 @@ icov.select <- function(est, criterion = 'stars', stars.thresh = 0.05, ebic.gamm
   }
 }
 
-
-
 #' @keywords internal
 dclr <- function(x) t(clr(apply(x, 1, norm_diric),2))
 #' @keywords internal
 dclrNPN <- function(x) huge::huge.npn(t(clr(apply(x, 1, norm_diric),2)), verbose=FALSE)
-
