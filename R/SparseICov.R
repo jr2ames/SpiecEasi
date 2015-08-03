@@ -105,23 +105,19 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
     est$data <- data
     est$sym  <- ifelse(!is.null(args$sym), args$sym, 'or')
     
-  } else if (method %in% c('GGM')) {
-    link <- 'gaussian'
-    if (is.null(args$lambda.path)) {
-            lmax = XMRF:::myglmnet.max(t(X), link = link)
+  } else if (method %in% c('GGM', 'ISM')) {
+        link <- switch(method, GGM='gaussian', ISM='binomial')
+        if (is.null(args$lambda.path)) {
+            lmax = XMRF:::myglmnet.max(t(data), link = link)
             if (is.null(args$lambda.min.ratio)) args$lambda.min.ratio <- .01
             if (is.null(args$nlams)) args$nlams <- 20
                 args$lambda = exp(seq(log(lmax), log(args$lambda.min.ratio), l = args$nlams))
         }
         args$lambda.min.ratio <- NULL
         args$nlams <- NULL
-    est <- do.call(XMRF:::glm.network, c(args, list(t(data), method, Y = NULL, link=link)))
-    est <- lapply(1:dim(est)[3], function(i) est[,,i])
-    
-  } else if (method %in% c('ISM')) {
-    link <- 'binomial'
-    est <- do.call(XMRF:::glm.network, c(args, list(t(data), method, Y = NULL))) 
-    
+        est <- do.call(XMRF:::glm.network, c(args, list(t(data), method, Y = NULL, link=link)))
+        est <- lapply(1:dim(est)[3], function(i) est[,,i])
+
   } else if (method %in% c('LPGM')) {
         if (is.null(args$lambda.path)) {
             lmax = lambdaMax(t(X))
