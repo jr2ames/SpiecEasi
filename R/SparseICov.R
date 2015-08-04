@@ -30,6 +30,8 @@ spiec.easi.default <- function(data, method='glasso', sel.criterion='stars', ver
   args <- list(...)
   if (verbose) message("Normalizing/clr transformation of data with pseudocount")
   data.clr <- t(clr(data+1, 1))
+  if (method %in% c('glasso', 'mb')) stop('Method not currently supported by main SpiecEasi pipeline')
+
   if (verbose) message(paste("Inverse Covariance Estimation with", method, "...", sep=" "))
   est      <- do.call('sparseiCov', c(list(data=data.clr, method=method), args))
   
@@ -111,7 +113,7 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
             lmax = XMRF:::myglmnet.max(t(data), link = link)
             if (is.null(args$lambda.min.ratio)) args$lambda.min.ratio <- .01
             if (is.null(args$nlams)) args$nlams <- 20
-                args$lambda = exp(seq(log(lmax), log(args$lambda.min.ratio), l = args$nlams))
+                args$lambda <- exp(seq(log(lmax), log(args$lambda.min.ratio), l = args$nlams))
         }
         args$lambda.min.ratio <- NULL
         args$nlams <- NULL
@@ -126,7 +128,7 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
             lmax = lambdaMax(t(X))
             if (is.null(args$lambda.min.ratio)) args$lambda.min.ratio <- .01
             if (is.null(args$nlams)) args$nlams <- 20
-                args$lambda = exp(seq(log(lmax), log(args$lambda.min.ratio), l = args$nlams))
+                args$lambda <- exp(seq(log(lmax), log(args$lambda.min.ratio), l = args$nlams))
         }
         args$lambda.min.ratio <- NULL
         args$nlams <- NULL
@@ -136,7 +138,6 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
         est$path <- path
         est$lambda <- args$lambda
         est$method <- method
-        
   }
     return(est)
 }
@@ -155,7 +156,7 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
 #' @importFrom parallel mclapply
 #' @export
 icov.select <- function(est, criterion = 'stars', stars.thresh = 0.05, ebic.gamma = 0.5, 
-                        stars.subsample.ratio = NULL, rep.num = 20, ncores=1, normfun=function(x) x, verbose=FALSE,...) {
+                        stars.subsample.ratio = NULL, rep.num = 20, ncores=1, verbose=FALSE,...) {
   gcinfo(FALSE)
 #  if (est$cov.input) {
 #    cat("Model selection is not available when using the covariance matrix as input.")
@@ -256,7 +257,7 @@ icov.select <- function(est, criterion = 'stars', stars.thresh = 0.05, ebic.gamm
       #            for (i in 1:nlambda) merge[[i]] <- Matrix(0, d, d)
       
       #    for (i in 1:rep.num) {
-      merge <- parallel::mclapply(1:rep.num, function(i)
+      premerge <- parallel::mclapply(1:rep.num, function(i)
       {
         #                if (verbose) {
         #                  mes <- paste(c("Conducting Subsampling....in progress:", 
@@ -287,22 +288,27 @@ icov.select <- function(est, criterion = 'stars', stars.thresh = 0.05, ebic.gamm
         return(tmp)
       }, mc.cores=ncores)
     #    })
-      # merge <- lapply(merge, as.matrix)
-      merge<-lapply(merge, function(x) simplify2array(lapply(x, as.matrix)) )
-      merge<-Reduce("+",merge)
-      est$merge <- lapply(1:dim(merge)[3], function(i) merge[,,i])
+
+#      merge <- lapply(merge, simplify2array)
+#      est$merge <- lapply(1:dim(merge)[3], function(i) merge[,,i]/rep.num)
+
+      merge <- Reduce(function(l1, l2) lapply(1:length(l1), 
+                    function(i) l1[[i]] + l2[[i]]), premerge, accumulate=FALSE)
+
       if (verbose) {
         mes = "Conducting Subsampling....done.                 "
         cat(mes, "\r")
         cat("\n")
         flush.console()
       }
-      est$variability = rep(0, nlambda)
+      est$variability <- rep(0, nlambda)
+      est$merge <- vector('list', nlambda)
       for (i in 1:nlambda) {
-        est$merge[[i]] = est$merge[[i]]/rep.num
-        est$variability[i] = 4 * sum(est$merge[[i]] * 
-                                       (1 - est$merge[[i]]))/(d * (d - 1))
+        est$merge[[i]]     <- merge[[i]]/rep.num
+        est$variability[i] <- 4 * sum(est$merge[[i]] * (1 - est$merge[[i]]))/(d * (d - 1))
       }
+      rm(premerge, merge)
+      gc()
       est$opt.index = max(which.max(est$variability >= 
                                       stars.thresh)[1] - 1, 1)
       est$refit = est$path[[est$opt.index]]
