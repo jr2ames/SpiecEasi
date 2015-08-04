@@ -119,8 +119,8 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
         est <- list()
         est$data <- data
         est$path <- lapply(1:length(args$lambda), function(i) path[,,i])
-        est$lambda.path <- args$lambda
-        
+        est$lambda <- args$lambda
+        est$method <- method        
   } else if (method %in% c('LPGM')) {
         if (is.null(args$lambda.path)) {
             lmax = lambdaMax(t(X))
@@ -134,7 +134,9 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
         est <- list()
         est$data <- data
         est$path <- path
-        est$lambda.path <- args$lambda
+        est$lambda <- args$lambda
+        est$method <- method
+        
   }
     return(est)
 }
@@ -153,14 +155,14 @@ sparseiCov <- function(data, method, npn=FALSE, verbose=FALSE, cov.output = TRUE
 #' @importFrom parallel mclapply
 #' @export
 icov.select <- function(est, criterion = 'stars', stars.thresh = 0.05, ebic.gamma = 0.5, 
-                        stars.subsample.ratio = NULL, rep.num = 20, ncores=1, normfun=function(x) x, verbose=FALSE) {
+                        stars.subsample.ratio = NULL, rep.num = 20, ncores=1, normfun=function(x) x, verbose=FALSE,...) {
   gcinfo(FALSE)
-  if (est$cov.input) {
-    cat("Model selection is not available when using the covariance matrix as input.")
-    class(est) = "select"
-    return(est)
-  }
-  if (!est$cov.input) {
+#  if (est$cov.input) {
+#    cat("Model selection is not available when using the covariance matrix as input.")
+#    class(est) = "select"
+#    return(est)
+#  }
+#  if (!est$cov.input) {
     if (est$method == "mb" && is.null(criterion)) 
       criterion = "stars"
     if (est$method == "ct" && is.null(criterion)) 
@@ -251,7 +253,6 @@ icov.select <- function(est, criterion = 'stars', stars.thresh = 0.05, ebic.gamm
         if (n <= 144) 
           stars.subsample.ratio = 0.8
       }
-      
       #            for (i in 1:nlambda) merge[[i]] <- Matrix(0, d, d)
       
       #    for (i in 1:rep.num) {
@@ -264,9 +265,12 @@ icov.select <- function(est, criterion = 'stars', stars.thresh = 0.05, ebic.gamm
         #                  flush.console()
         #                }
         #                merge <- replicate(nlambda, Matrix(0, d,d))
-        ind.sample = sample(c(1:n), floor(n * stars.subsample.ratio), 
+        ind.sample <- sample(c(1:n), floor(n * stars.subsample.ratio), 
                             replace = FALSE)
-#        if (est$method == "mb") 
+                            
+         if (est$method %in% c('mb','glasso', 'GGM','ISM','LPGM'))
+           tmp <- sparseiCov(data = est$data[ind.sample, ], method = est$method, lambda = est$lambda, verbose=FALSE,...)$path
+#        if (est$method %in% c("mb") 
 #          tmp = huge.mb(normfun(est$data[ind.sample, ]), lambda = est$lambda, 
 #                        scr = est$scr, idx.mat = est$idx.mat, sym = est$sym, 
 #                        verbose = FALSE)$path
@@ -276,13 +280,13 @@ icov.select <- function(est, criterion = 'stars', stars.thresh = 0.05, ebic.gamm
 #        if (est$method == "glasso") 
 #          tmp = huge.glasso(normfun(est$data[ind.sample, ]), lambda = est$lambda, 
 #                            scr = est$scr, verbose = FALSE)$path
-        #                for (j in 1:nlambda) merge[[j]] <- merge[[j]] + tmp[[j]]
-        
+#                        for (j in 1:nlambda) merge[[j]] <- merge[[j]] + tmp[[j]]
+#        
         rm(ind.sample)
         gc()
         return(tmp)
       }, mc.cores=ncores)
-      #  }
+    #    })
       # merge <- lapply(merge, as.matrix)
       merge<-lapply(merge, function(x) simplify2array(lapply(x, as.matrix)) )
       merge<-Reduce("+",merge)
@@ -313,7 +317,7 @@ icov.select <- function(est, criterion = 'stars', stars.thresh = 0.05, ebic.gamm
     est$criterion = criterion
     class(est) = "select"
     return(est)
-  }
+  #}
 }
 
 #' @keywords internal
